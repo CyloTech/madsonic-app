@@ -47,10 +47,11 @@ api_status() {
     echo "${api_result:-no-response}${api_code:+ ${api_code}}"
 }
 
-# Wait up to 10 minutes for the Madsonic API to answer.
+# Wait up to 30 minutes for the Madsonic API to answer. The first start
+# unpacks the web app and creates the database, which is slow on a busy disk.
 wait_for_api() {
     wait_count=0
-    while [ "${wait_count}" -lt 300 ]; do
+    while [ "${wait_count}" -lt 900 ]; do
         madsonic_api ping admin admin | grep -q '"madsonic-response"' && return 0
         wait_count=$((wait_count + 1))
         sleep 2

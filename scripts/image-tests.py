@@ -28,6 +28,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -354,7 +355,9 @@ try:
           'one callback, restart quiet', flush=True)
     print('PASS image tests', flush=True)
 except Exception as error:
-    print('FAIL image tests: ' + type(error).__name__ + ': ' + redact(str(error)), flush=True)
+    where = traceback.extract_tb(error.__traceback__)[-1]
+    print('FAIL image tests (line ' + str(where.lineno) + ': ' + redact(where.line or '') + '): '
+          + type(error).__name__ + ': ' + redact(str(error)), flush=True)
     raise SystemExit(1)
 finally:
     for name in reversed(containers):
