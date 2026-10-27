@@ -148,8 +148,8 @@ def base_url(name):
     return 'http://' + docker('port', name, '80/tcp').stdout.decode().splitlines()[0].strip()
 
 
-def api(name, view, user, password, encode=True, **params):
-    query = {'u': user, 'p': ('enc:' + password.encode().hex()) if encode else password,
+def api(name, view, auth_user, auth_password, encode=True, **params):
+    query = {'u': auth_user, 'p': ('enc:' + auth_password.encode().hex()) if encode else auth_password,
              'v': '2.6.0', 'c': 'cylo', 'f': 'json', **params}
     url = base_url(name) + '/rest2/' + view + '.view?' + urllib.parse.urlencode(query)
     with urllib.request.urlopen(url, timeout=20) as response:
