@@ -54,7 +54,7 @@ EOF
     kill -9 $(pgrep java)
 
     #Tell Apex we're done installing.
-    curl -i -H "Accept: application/json" -H "Content-Type:application/json" -X POST "https://api.cylo.io/v1/apps/installed/$INSTANCE_ID"
+    curl -i -H "Accept: application/json" -H "Content-Type:application/json" -X POST "https://api.cylo.net/v1/apps/installed/$INSTANCE_ID"
     touch /etc/app_configured
 
 fi
