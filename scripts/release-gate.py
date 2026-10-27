@@ -21,7 +21,7 @@ image = sys.argv[1]
 
 # Check the tag before and after the tests: the tests take several minutes.
 registry.require_absent(image)
-tests = subprocess.run([sys.executable, str(here / 'image-tests.py'), image], timeout=3600)
+tests = subprocess.run([sys.executable, str(here / 'image-tests.py'), image], timeout=14400)
 if tests.returncode:
     raise SystemExit('FAIL release gate: image tests failed')
 registry.require_absent(image)

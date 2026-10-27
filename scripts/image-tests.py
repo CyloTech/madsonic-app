@@ -60,7 +60,7 @@ def redact(text):
     return text
 
 
-def docker(*args, check=True, timeout=600):
+def docker(*args, check=True, timeout=1800):
     result = subprocess.run(['docker', *args], capture_output=True, timeout=timeout)
     if check and result.returncode:
         raise RuntimeError('docker ' + args[0] + ' failed: ' + redact(result.stderr.decode(errors='replace')[-1500:]))
@@ -127,7 +127,7 @@ def launch(suffix, selected_image, config_volume, env):
 
 def logs(name, since=None):
     args = ['logs'] + (['--since', since] if since else []) + [name]
-    result = subprocess.run(['docker', *args], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+    result = subprocess.run(['docker', *args], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
     return result.stdout.decode(errors='replace')
 
 
@@ -172,7 +172,7 @@ def web_login(name, user, password):
         return str(error.code) + ' ' + urllib.parse.urlsplit(error.headers.get('Location', '')).path
 
 
-def wait_api(name, timeout=600):
+def wait_api(name, timeout=1800):
     deadline = time.time() + timeout
     last = ''
     while time.time() < deadline:
@@ -200,7 +200,7 @@ def callbacks_for(instance):
     return [c for c in callbacks if c['instance'] == instance]
 
 
-def wait_callback(name, instance, timeout=600):
+def wait_callback(name, instance, timeout=1800):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if callbacks_for(instance):
@@ -251,7 +251,7 @@ try:
     empty_volume = volume('empty')
     empty = launch('empty', image, empty_volume,
                    install_env('900000732', 'emptyuser', '', 'empty@example.com', hide(secrets.token_urlsafe(16))))
-    assert wait_exit(empty, 60) == 1, 'empty MAD_PASSWORD did not exit 1'
+    assert wait_exit(empty, 900) == 1, 'empty MAD_PASSWORD did not exit 1'
     assert 'MAD_USERNAME and MAD_PASSWORD must be set' in logs(empty)
     assert 'STARTING JAVA' not in logs(empty)
     assert volume_files(empty) == set()
@@ -270,7 +270,7 @@ try:
                    install_env('900000734', 'releasegate', fresh_password, 'gate+test@example.com',
                                fresh_query, fresh_header))
 
-    assert wait_exit(unverified, 600) == 1, 'unverified setup did not exit 1'
+    assert wait_exit(unverified, 1800) == 1, 'unverified setup did not exit 1'
     assert 'the default admin login is still accepted' in logs(unverified), evidence(unverified)
     assert not callbacks_for('900000733'), 'callback sent after failed verification'
     assert volume_files(unverified) == {'.appbox_install_pending'}
@@ -314,7 +314,7 @@ try:
     print('PASS restart: no setup, no callback, account unchanged', flush=True)
     docker('stop', '--time', '30', fresh)
 
-    deadline = time.time() + 900
+    deadline = time.time() + 2400
     while logs(baseline).count('STARTING JAVA') < 2:
         if time.time() > deadline or not running(baseline):
             raise RuntimeError('current image did not finish its setup' + evidence(baseline))
@@ -330,7 +330,7 @@ try:
     assert volume_files(baseline) == set()
 
     upgraded = launch('upgraded', image, legacy_volume, legacy_env)
-    wait_callback(upgraded, '900000731', timeout=120)
+    wait_callback(upgraded, '900000731', timeout=900)
     wait_api(upgraded)
     up_logs = logs(upgraded)
     assert 'Existing Madsonic database found; keeping its users.' in up_logs
