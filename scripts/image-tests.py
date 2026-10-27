@@ -11,9 +11,10 @@ Scenarios (each with its own volume, labelled and removed afterwards):
   empty         MAD_PASSWORD empty: exits 1 before starting Madsonic, no callback
   unverified    MAD_USERNAME=admin, so admin:admin cannot be disabled: setup
                 verification fails, exit 1, no callback, no configured marker
-  upgrade       the current published image installs, the customer changes the
-                password, then this image starts on the same volume: no setup,
-                the changed password still works, one callback; then a restart
+  upgrade       the current published image installs and the customer adds a
+                user, then this image starts on the same volume with a different
+                MAD_PASSWORD: no setup, both accounts keep their passwords, the
+                new MAD_PASSWORD is not applied, one callback; then a restart
 Callbacks go to a local mock API; api.cylo.net and api.cylo.io resolve to
 127.0.0.1 inside every container, so nothing reaches the real API.
 """
@@ -323,24 +324,31 @@ try:
     wait_api(baseline)
     assert api(baseline, 'ping', 'legacyuser', legacy_password) == 'ok'
     assert api(baseline, 'ping', 'admin', 'admin') == 'failed 40'
-    changed_password = hide('Changed' + secrets.token_hex(6))
-    assert api(baseline, 'changePassword', 'legacyuser', legacy_password,
-               username='legacyuser', password='enc:' + changed_password.encode().hex()) == 'ok'
-    assert api(baseline, 'ping', 'legacyuser', changed_password) == 'ok'
+    # The customer adds a user. (Madsonic's changePassword.view stores a
+    # password that no longer logs in, so it cannot stand in for a customer
+    # changing theirs in the web UI.)
+    other_password = hide('Other' + secrets.token_hex(6))
+    assert api(baseline, 'createUser', 'legacyuser', legacy_password, username='otheruser',
+               password='enc:' + other_password.encode().hex(), email='other@example.com') == 'ok'
+    assert api(baseline, 'ping', 'otheruser', other_password) == 'ok'
     docker('stop', '--time', '30', baseline)
     assert volume_files(baseline) == set()
 
-    upgraded = launch('upgraded', image, legacy_volume, legacy_env)
+    # MAD_PASSWORD no longer matches the account, as after a password change
+    # in Madsonic. Setup must not run, so this value must not be applied.
+    changed_env = dict(legacy_env, MAD_PASSWORD=hide('Changed' + secrets.token_hex(6)))
+    upgraded = launch('upgraded', image, legacy_volume, changed_env)
     wait_callback(upgraded, '900000731', timeout=900)
     wait_api(upgraded)
     up_logs = logs(upgraded)
     assert 'Existing Madsonic database found; keeping its users.' in up_logs
     assert 'ADDING NEW ADMIN USER' not in up_logs
     assert len(callbacks_for('900000731')) == 1
-    assert api(upgraded, 'ping', 'legacyuser', changed_password) == 'ok'
-    assert api(upgraded, 'ping', 'legacyuser', legacy_password) == 'failed 40'
+    assert api(upgraded, 'ping', 'legacyuser', legacy_password) == 'ok'
+    assert api(upgraded, 'ping', 'otheruser', other_password) == 'ok'
+    assert api(upgraded, 'ping', 'legacyuser', changed_env['MAD_PASSWORD']) == 'failed 40'
     assert api(upgraded, 'ping', 'admin', 'admin') == 'failed 40'
-    assert web_login(upgraded, 'legacyuser', changed_password) == '302 /index.view'
+    assert web_login(upgraded, 'legacyuser', legacy_password) == '302 /index.view'
     assert volume_files(upgraded) == {'.appbox_configured'}
     check_runtime(upgraded)
     check_no_secrets(upgraded)
@@ -350,8 +358,8 @@ try:
     time.sleep(20)
     assert 'Madsonic is already set up.' in logs(upgraded, since)
     assert len(callbacks_for('900000731')) == 1, 'restart after upgrade sent another callback'
-    assert api(upgraded, 'ping', 'legacyuser', changed_password) == 'ok'
-    print('PASS upgrade from the current image: users and the changed password kept, no setup, '
+    assert api(upgraded, 'ping', 'legacyuser', legacy_password) == 'ok'
+    print('PASS upgrade from the current image: users and passwords kept, MAD_PASSWORD not applied, no setup, '
           'one callback, restart quiet', flush=True)
     print('PASS image tests', flush=True)
 except Exception as error:
